@@ -294,6 +294,9 @@ func writeProperty(buf *bytes.Buffer, prop *Property, qualifiedReceiver string, 
 			qualifiedReceiver, trString(&prop.String)))
 
 	case "orientation":
+		if widget.Class == "QSplitter" {
+			return
+		}
 		var orientation string
 		switch prop.Enum {
 		case "Qt::Horizontal":
@@ -578,6 +581,9 @@ func writeWidgetInitialization(buf *bytes.Buffer, widget *Widget, parent *Widget
 	case "QWebView":
 		typ = "WebView"
 
+	case "QListView", "QListWidget":
+		typ = "ListBox"
+
 	case "QWidget":
 		if parent != nil && parent.Class == "QTabWidget" {
 			typ = "TabPage"
@@ -611,6 +617,26 @@ func writeWidgetInitialization(buf *bytes.Buffer, widget *Widget, parent *Widget
 				}
 				`,
 				widget.Name, receiver))
+		} else if typ == "Splitter" {
+			for _, prop := range widget.Property {
+				if prop.Name == "orientation" {
+					switch prop.Enum {
+					case "Qt::Horizontal":
+						typ = "NewHSplitter"
+					case "Qt::Vertical":
+						typ = "NewVSplitter"
+					}
+					break
+				}
+			}
+			buf.WriteString(fmt.Sprintf(
+				`
+				// %s
+				if %s, err = walk.%s(%s); err != nil {
+				return err
+				}
+				`,
+				widget.Name, receiver, typ, qualifiedParent))
 		} else {
 			buf.WriteString(fmt.Sprintf(
 				`
@@ -722,6 +748,9 @@ func writeWidgetDecl(buf *bytes.Buffer, widget *Widget, parent *Widget) error {
 
 	case "QWebView":
 		typ = "walk.WebView"
+
+	case "QListView", "QListWidget":
+		typ = "walk.ListBox"
 
 	case "QWidget":
 		if parent != nil && parent.Class == "QTabWidget" {
